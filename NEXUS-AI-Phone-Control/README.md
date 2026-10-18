@@ -1,38 +1,53 @@
 # NEXUS AI Phone Control
 
-NEXUS AI Phone Control is a demo-ready AI phone management assistant with a browser dashboard and a lightweight local backend. It lets you prompt the system in natural language to trigger device actions such as phone calls, SMS, security commands, and status checks.
+NEXUS AI Phone Control is a production-ready demo for an AI-powered phone assistant. It combines a local Express backend, natural language command parsing, optional OpenAI integration, and a simple browser dashboard for controlling a virtual smartphone.
 
 ## Features
 
-- Natural language command parsing
-- Phone call simulation
-- SMS sending simulation
-- Device status and health view
-- Security action controls
-- Browser-based control dashboard
+- AI assistant endpoint for natural-language phone actions
+- Device health and status monitoring
+- Call and SMS simulation
+- Security/device actions such as lock, unlock, ring, mute, and camera commands
+- Optional OpenAI API integration for real AI reasoning
+- Simple auth/session flow for secure demo access
 
-## Run locally
+## Quick start
 
 ```bash
 cd NEXUS-AI-Phone-Control
 npm install
+cp .env.example .env
 npm start
 ```
 
-Then open:
+Open the app in your browser:
 
 - http://localhost:3000
 
-## Example AI prompts
+## Environment setup
+
+Create a `.env` file based on `.env.example` if you want to enable real AI processing:
+
+```env
+PORT=3000
+JWT_SECRET=change-this-secret
+OPENAI_API_KEY=your_key_here
+OPENAI_MODEL=gpt-4o-mini
+```
+
+If `OPENAI_API_KEY` is not set, the app falls back to a built-in local intent parser.
+
+## Example prompts
 
 - "Call +1 555 123 4567"
 - "Send a reminder to +1 555 123 4567"
-- "Check battery status"
+- "Check my battery and signal"
 - "Lock the device"
-- "What is the current device status?"
+- "What is the current status?"
 
 ## API
 
+- `POST /api/auth/login`
 - `GET /api/health`
 - `GET /api/device`
 - `POST /api/call`
@@ -40,6 +55,6 @@ Then open:
 - `POST /api/command`
 - `POST /api/assistant`
 
-## Architecture
+## Notes
 
-This version uses a Python-free Node.js stack for simple deployment and quick iteration. The assistant logic is intentionally lightweight and easy to replace with a third-party AI service or workflow engine later.
+This project is intended as an extensible starter. It is ready to be connected to real telephony providers, message APIs, or a hosted LLM service when needed.

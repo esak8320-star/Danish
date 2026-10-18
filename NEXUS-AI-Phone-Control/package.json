@@ -1,7 +1,7 @@
 {
   "name": "nexus-ai-phone-control",
-  "version": "1.1.0",
-  "description": "AI-powered phone control dashboard with natural language assistant logic",
+  "version": "1.2.0",
+  "description": "AI-powered phone control dashboard with optional OpenAI integration and secure demo auth",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -12,12 +12,16 @@
     "phone",
     "assistant",
     "automation",
-    "dashboard"
+    "dashboard",
+    "openai"
   ],
   "author": "NEXUS",
   "license": "MIT",
   "dependencies": {
     "cors": "^2.8.5",
-    "express": "^4.19.2"
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "openai": "^4.39.0"
   }
 }

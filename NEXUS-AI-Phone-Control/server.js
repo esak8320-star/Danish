@@ -1,9 +1,17 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const jwt = require('jsonwebtoken');
+const OpenAI = require('openai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || 'nexus-demo-secret';
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+
+const openai = OPENAI_API_KEY ? new OpenAI({ apiKey: OPENAI_API_KEY }) : null;
 
 app.use(cors());
 app.use(express.json());
@@ -20,7 +28,8 @@ const deviceState = {
   callStatus: 'idle',
   lastDialed: null,
   lastMessage: null,
-  lastCommand: null
+  lastCommand: null,
+  owner: 'NEXUS User'
 };
 
 const normalizePhone = (value) => {
@@ -28,17 +37,16 @@ const normalizePhone = (value) => {
   return String(value).replace(/[^+\d]/g, '').trim();
 };
 
-const getStatusSummary = () => {
-  return {
-    status: deviceState.status,
-    battery: deviceState.battery,
-    signal: deviceState.signal,
-    location: deviceState.location,
-    callStatus: deviceState.callStatus,
-    lastActivity: deviceState.lastActivity,
-    device: deviceState.name
-  };
-};
+const getStatusSummary = () => ({
+  status: deviceState.status,
+  battery: deviceState.battery,
+  signal: deviceState.signal,
+  location: deviceState.location,
+  callStatus: deviceState.callStatus,
+  lastActivity: deviceState.lastActivity,
+  device: deviceState.name,
+  owner: deviceState.owner
+});
 
 const parseCommand = (text) => {
   const cleaned = String(text || '').trim().toLowerCase();
@@ -47,7 +55,7 @@ const parseCommand = (text) => {
     return { type: 'unknown', intent: 'unknown', message: 'No command provided.' };
   }
 
-  if (/call\s|dial\s|phone\s/.test(cleaned)) {
+  if (/(call|dial|phone)/.test(cleaned)) {
     const number = normalizePhone(cleaned.match(/\+?\d[\d\s()+-]{6,}/)?.[0] || cleaned.match(/\d{7,}/)?.[0]);
     return {
       type: 'call',
@@ -57,7 +65,7 @@ const parseCommand = (text) => {
     };
   }
 
-  if (/sms|text\s+message|send\s+text/.test(cleaned)) {
+  if (/(sms|text|message)/.test(cleaned)) {
     const number = normalizePhone(cleaned.match(/\+?\d[\d\s()+-]{6,}/)?.[0] || cleaned.match(/\d{7,}/)?.[0]);
     const message = cleaned.replace(/(sms|text|message|send)/g, '').trim();
     return {
@@ -69,7 +77,7 @@ const parseCommand = (text) => {
     };
   }
 
-  if (/status|health|battery|signal|location|info/.test(cleaned)) {
+  if (/(status|health|battery|signal|location|info)/.test(cleaned)) {
     return { type: 'status', intent: 'status' };
   }
 
@@ -96,15 +104,53 @@ const parseCommand = (text) => {
   return { type: 'unknown', intent: 'unknown', message: 'I did not understand that request.' };
 };
 
+const verifyToken = (req, res, next) => {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+  if (!token) {
+    return res.status(401).json({ error: 'Authentication required.' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid token.' });
+  }
+};
+
+app.post('/api/auth/login', (req, res) => {
+  const { username, password } = req.body || {};
+
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required.' });
+  }
+
+  if (username !== 'nexus' || password !== 'admin123') {
+    return res.status(401).json({ error: 'Invalid credentials.' });
+  }
+
+  const token = jwt.sign({ username, role: 'admin' }, JWT_SECRET, { expiresIn: '12h' });
+
+  return res.json({
+    success: true,
+    token,
+    user: { username, role: 'admin' }
+  });
+});
+
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     service: 'nexus-ai-phone-control',
+    aiEnabled: Boolean(openai),
     timestamp: new Date().toISOString()
   });
 });
 
-app.get('/api/device', (req, res) => {
+app.get('/api/device', verifyToken, (req, res) => {
   res.json({
     ...deviceState,
     ...getStatusSummary(),
@@ -112,7 +158,7 @@ app.get('/api/device', (req, res) => {
   });
 });
 
-app.post('/api/call', (req, res) => {
+app.post('/api/call', verifyToken, (req, res) => {
   const { number } = req.body || {};
   const normalizedNumber = normalizePhone(number);
 
@@ -132,7 +178,7 @@ app.post('/api/call', (req, res) => {
   });
 });
 
-app.post('/api/sms', (req, res) => {
+app.post('/api/sms', verifyToken, (req, res) => {
   const { to, message } = req.body || {};
   const normalizedTo = normalizePhone(to);
 
@@ -155,7 +201,7 @@ app.post('/api/sms', (req, res) => {
   });
 });
 
-app.post('/api/command', (req, res) => {
+app.post('/api/command', verifyToken, (req, res) => {
   const { action } = req.body || {};
   const allowed = ['lock', 'unlock', 'mute', 'ring', 'camera', 'flash'];
 
@@ -176,20 +222,106 @@ app.post('/api/command', (req, res) => {
   });
 });
 
-app.post('/api/assistant', (req, res) => {
+app.post('/api/assistant', verifyToken, async (req, res) => {
   const { prompt } = req.body || {};
+
+  if (!prompt || !String(prompt).trim()) {
+    return res.status(400).json({ error: 'A prompt is required.' });
+  }
+
+  if (openai) {
+    try {
+      const completion = await openai.chat.completions.create({
+        model: OPENAI_MODEL,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are NEXUS AI Phone Control. Convert user requests into device actions using short, action-oriented replies.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.4
+      });
+
+      const text = completion.choices?.[0]?.message?.content || 'I processed the request.';
+      const parsed = parseCommand(text + ' ' + prompt);
+
+      if (parsed.type === 'call') {
+        if (!parsed.number) {
+          return res.json({ reply: 'I can call someone, but I need a valid number.', action: 'call', success: false });
+        }
+
+        deviceState.callStatus = 'dialing';
+        deviceState.lastDialed = parsed.number;
+        deviceState.lastActivity = 'AI placed call to ' + parsed.number;
+
+        return res.json({
+          reply: `Calling ${parsed.number} now.`,
+          action: 'call',
+          success: true,
+          data: { number: parsed.number, callStatus: 'dialing' }
+        });
+      }
+
+      if (parsed.type === 'sms') {
+        if (!parsed.number) {
+          return res.json({ reply: 'I can send a text, but I need a recipient number.', action: 'sms', success: false });
+        }
+
+        deviceState.lastMessage = {
+          to: parsed.number,
+          message: parsed.messageText,
+          sentAt: new Date().toISOString()
+        };
+        deviceState.lastActivity = 'AI sent SMS to ' + parsed.number;
+
+        return res.json({
+          reply: `SMS sent to ${parsed.number}.`,
+          action: 'sms',
+          success: true,
+          data: { to: parsed.number, message: parsed.messageText }
+        });
+      }
+
+      if (parsed.type === 'status') {
+        return res.json({
+          reply: `Battery is ${deviceState.battery}%, signal is ${deviceState.signal}, and location is ${deviceState.location}.`,
+          action: 'status',
+          success: true,
+          data: getStatusSummary()
+        });
+      }
+
+      if (parsed.type === 'command') {
+        deviceState.lastCommand = parsed.action;
+        deviceState.lastActivity = 'AI command: ' + parsed.action;
+        return res.json({
+          reply: `The ${parsed.action} command was accepted.`,
+          action: parsed.action,
+          success: true
+        });
+      }
+
+      return res.json({
+        reply: text || 'I processed the request.',
+        action: 'assistant',
+        success: true
+      });
+    } catch (error) {
+      console.error('OpenAI error:', error.message);
+    }
+  }
+
   const parsed = parseCommand(prompt);
 
   if (parsed.type === 'call') {
     if (!parsed.number) {
-      return res.json({
-        reply: 'I can place a call, but I need a valid phone number to continue.',
-        action: 'call',
-        success: false
-      });
+      return res.json({ reply: 'I can place a call, but I need a valid phone number to continue.', action: 'call', success: false });
     }
 
-    const response = { status: 'queued', number: parsed.number, callStatus: 'dialing' };
     deviceState.callStatus = 'dialing';
     deviceState.lastDialed = parsed.number;
     deviceState.lastActivity = 'AI placed call to ' + parsed.number;
@@ -198,17 +330,13 @@ app.post('/api/assistant', (req, res) => {
       reply: `Calling ${parsed.number} now.`,
       action: 'call',
       success: true,
-      data: response
+      data: { number: parsed.number, callStatus: 'dialing' }
     });
   }
 
   if (parsed.type === 'sms') {
     if (!parsed.number) {
-      return res.json({
-        reply: 'I can send a text, but I need a recipient number.',
-        action: 'sms',
-        success: false
-      });
+      return res.json({ reply: 'I can send a text, but I need a recipient number.', action: 'sms', success: false });
     }
 
     deviceState.lastMessage = {
@@ -222,32 +350,26 @@ app.post('/api/assistant', (req, res) => {
       reply: `SMS sent to ${parsed.number}.`,
       action: 'sms',
       success: true,
-      data: {
-        to: parsed.number,
-        message: parsed.messageText,
-        timestamp: deviceState.lastMessage.sentAt
-      }
+      data: { to: parsed.number, message: parsed.messageText }
+    });
+  }
+
+  if (parsed.type === 'status') {
+    return res.json({
+      reply: `Battery is ${deviceState.battery}%, signal is ${deviceState.signal}, and location is ${deviceState.location}.`,
+      action: 'status',
+      success: true,
+      data: getStatusSummary()
     });
   }
 
   if (parsed.type === 'command') {
     deviceState.lastCommand = parsed.action;
     deviceState.lastActivity = 'AI command: ' + parsed.action;
-
     return res.json({
-      reply: `The device ${parsed.action} command was accepted.`,
+      reply: `The ${parsed.action} command was accepted.`,
       action: parsed.action,
       success: true
-    });
-  }
-
-  if (parsed.type === 'status') {
-    const summary = getStatusSummary();
-    return res.json({
-      reply: `Battery is ${summary.battery}%, signal is ${summary.signal}, location is ${summary.location}, and device status is ${summary.status}.`,
-      action: 'status',
-      success: true,
-      data: summary
     });
   }
 
@@ -264,4 +386,5 @@ app.get('*', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`NEXUS AI Phone Control running on http://localhost:${PORT}`);
+  console.log(`AI integration: ${openai ? 'enabled' : 'fallback parser only'}`);
 });
