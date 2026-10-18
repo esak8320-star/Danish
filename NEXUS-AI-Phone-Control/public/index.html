@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NEXUS AI Phone Control</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">NEXUS</p>
+          <h1>AI Phone Control</h1>
+        </div>
+        <div class="status-pill" id="deviceStatus">Online</div>
+      </header>
+
+      <main class="grid">
+        <section class="panel">
+          <h2>Device Overview</h2>
+          <div class="metrics">
+            <div class="metric">
+              <span>Battery</span>
+              <strong id="battery">--</strong>
+            </div>
+            <div class="metric">
+              <span>Signal</span>
+              <strong id="signal">--</strong>
+            </div>
+            <div class="metric">
+              <span>Location</span>
+              <strong id="location">--</strong>
+            </div>
+          </div>
+          <div class="info-block">
+            <p><strong>Device:</strong> <span id="deviceName">--</span></p>
+            <p><strong>Last Activity:</strong> <span id="lastActivity">--</span></p>
+          </div>
+        </section>
+
+        <section class="panel action-panel">
+          <h2>Quick Actions</h2>
+          <div class="action-group">
+            <label for="numberInput">Phone number</label>
+            <input id="numberInput" type="tel" placeholder="+1 555 123 4567" />
+            <button id="callBtn">Call</button>
+          </div>
+
+          <div class="action-group">
+            <label for="messageInput">SMS</label>
+            <textarea id="messageInput" rows="3" placeholder="Type a message..."></textarea>
+            <button id="smsBtn">Send SMS</button>
+          </div>
+
+          <div class="button-row">
+            <button class="secondary" data-action="lock">Lock</button>
+            <button class="secondary" data-action="unlock">Unlock</button>
+            <button class="secondary" data-action="mute">Mute</button>
+            <button class="secondary" data-action="ring">Ring</button>
+          </div>
+        </section>
+      </main>
+
+      <section class="panel response-panel">
+        <h2>System Response</h2>
+        <div id="responseBox" class="response-box">Ready.</div>
+      </section>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
