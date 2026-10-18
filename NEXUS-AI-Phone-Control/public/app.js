@@ -1,10 +1,20 @@
 const responseBox = document.getElementById('responseBox');
+const assistantChat = document.getElementById('assistantChat');
+const assistantInput = document.getElementById('assistantInput');
 const statusLabel = document.getElementById('deviceStatus');
 const batteryEl = document.getElementById('battery');
 const signalEl = document.getElementById('signal');
 const locationEl = document.getElementById('location');
 const deviceNameEl = document.getElementById('deviceName');
 const activityEl = document.getElementById('lastActivity');
+
+const appendChat = (role, text) => {
+  const entry = document.createElement('div');
+  entry.className = `chat-entry ${role}`;
+  entry.textContent = text;
+  assistantChat.appendChild(entry);
+  assistantChat.scrollTop = assistantChat.scrollHeight;
+};
 
 const setStatus = (message, tone = 'neutral') => {
   responseBox.textContent = message;
@@ -16,7 +26,7 @@ const refreshDevice = async () => {
     const res = await fetch('/api/device');
     const data = await res.json();
 
-    statusLabel.textContent = data.status.toUpperCase();
+    statusLabel.textContent = String(data.status || 'ONLINE').toUpperCase();
     batteryEl.textContent = `${data.battery}%`;
     signalEl.textContent = data.signal;
     locationEl.textContent = data.location;
@@ -90,8 +100,36 @@ const triggerCommand = async (action) => {
   }
 };
 
+const handleAssistantPrompt = async () => {
+  const prompt = assistantInput.value.trim();
+  if (!prompt) return;
+
+  appendChat('user', prompt);
+  assistantInput.value = '';
+
+  try {
+    const res = await fetch('/api/assistant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+
+    const data = await res.json();
+    appendChat('assistant', data.reply || 'I am ready to help.');
+    setStatus(data.reply || 'Request processed.', data.success ? 'success' : 'neutral');
+    await refreshDevice();
+  } catch (error) {
+    appendChat('assistant', 'The assistant could not process that request.');
+    setStatus('Assistant request failed.', 'error');
+  }
+};
+
 document.getElementById('callBtn').addEventListener('click', callPhone);
 document.getElementById('smsBtn').addEventListener('click', sendSms);
+document.getElementById('assistantBtn').addEventListener('click', handleAssistantPrompt);
+document.getElementById('assistantInput').addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') handleAssistantPrompt();
+});
 document.querySelectorAll('[data-action]').forEach((button) => {
   button.addEventListener('click', () => triggerCommand(button.dataset.action));
 });

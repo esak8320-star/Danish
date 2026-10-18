@@ -13,7 +13,7 @@
           <p class="eyebrow">NEXUS</p>
           <h1>AI Phone Control</h1>
         </div>
-        <div class="status-pill" id="deviceStatus">Online</div>
+        <div class="status-pill" id="deviceStatus">ONLINE</div>
       </header>
 
       <main class="grid">
@@ -62,9 +62,20 @@
         </section>
       </main>
 
+      <section class="panel assistant-panel">
+        <h2>AI Assistant</h2>
+        <div class="assistant-row">
+          <input id="assistantInput" type="text" placeholder="Ask the phone assistant to call, text, lock, or check status..." />
+          <button id="assistantBtn">Send</button>
+        </div>
+        <div id="assistantChat" class="chat-panel">
+          <div class="chat-entry system">Welcome to NEXUS AI. Try: "Call +1 555 123 4567".</div>
+        </div>
+      </section>
+
       <section class="panel response-panel">
         <h2>System Response</h2>
-        <div id="responseBox" class="response-box">Ready.</div>
+        <div id="responseBox" class="response-box" data-tone="neutral">Ready.</div>
       </section>
     </div>
 

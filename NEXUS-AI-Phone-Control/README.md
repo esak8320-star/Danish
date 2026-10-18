@@ -1,16 +1,17 @@
 # NEXUS AI Phone Control
 
-A lightweight AI phone-control dashboard and API starter built for local demo use. It simulates core phone actions such as dialing, messaging, device status checks, and sending simple control commands.
+NEXUS AI Phone Control is a demo-ready AI phone management assistant with a browser dashboard and a lightweight local backend. It lets you prompt the system in natural language to trigger device actions such as phone calls, SMS, security commands, and status checks.
 
 ## Features
 
-- Device health and status view
-- Mock call initiation and termination
-- SMS sending actions
-- Remote device commands
-- Browser dashboard for quick local testing
+- Natural language command parsing
+- Phone call simulation
+- SMS sending simulation
+- Device status and health view
+- Security action controls
+- Browser-based control dashboard
 
-## Quick start
+## Run locally
 
 ```bash
 cd NEXUS-AI-Phone-Control
@@ -22,14 +23,23 @@ Then open:
 
 - http://localhost:3000
 
-## API endpoints
+## Example AI prompts
+
+- "Call +1 555 123 4567"
+- "Send a reminder to +1 555 123 4567"
+- "Check battery status"
+- "Lock the device"
+- "What is the current device status?"
+
+## API
 
 - `GET /api/health`
 - `GET /api/device`
 - `POST /api/call`
 - `POST /api/sms`
 - `POST /api/command`
+- `POST /api/assistant`
 
-## Notes
+## Architecture
 
-This project is intentionally simple and demo-focused. It is designed as a starting point for an AI-powered phone assistant and can be extended with real mobile integrations, voice pipelines, or async job processing.
+This version uses a Python-free Node.js stack for simple deployment and quick iteration. The assistant logic is intentionally lightweight and easy to replace with a third-party AI service or workflow engine later.
